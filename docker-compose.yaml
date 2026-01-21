@@ -1,0 +1,54 @@
+# nginx proxy address - http://172.17.0.1:22300
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "1"
+
+services:
+  joplin:
+    image: joplin/joplin:latest
+    container_name: joplin-app
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - joplin
+    ports:
+      - "22300:22300"
+    environment:
+      TZ: ${TZ:-America/New_York}
+    volumes:
+      - ./rootfs/data/joplin:/data
+      - ./rootfs/config/joplin:/config
+    depends_on:
+      - joplin-db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:22300"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  joplin-db:
+    image: postgres:16-alpine
+    container_name: joplin-db
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - joplin
+    environment:
+      TZ: ${TZ:-America/New_York}
+      POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-joplin}
+      POSTGRES_USER: ${DB_USER_NAME:-joplin}
+      POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
+    volumes:
+      - ./rootfs/db/postgres/joplin:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${{POSTGRES_USER}} -d $${{POSTGRES_DB}}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  joplin:
+    external: false
