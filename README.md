@@ -50,9 +50,9 @@ See `docker-compose.yaml` for complete list of configurable options.
 
 ## 📂 Volumes
 
-- `./rootfs/data/joplin` - Data storage
-- `./rootfs/config/joplin` - Data storage
-- `./rootfs/data/db/postgres/joplin` - Data storage
+- `./volumes/data/joplin` - Data storage
+- `./volumes/config/joplin` - Data storage
+- `./volumes/data/db/postgres/joplin` - Data storage
 
 ## 🔐 Security
 
