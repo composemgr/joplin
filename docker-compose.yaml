@@ -1,5 +1,6 @@
 # nginx proxy address - http://172.17.0.1:22300
 
+name: joplin
 x-logging: &default-logging
   driver: json-file
   options:
@@ -9,20 +10,27 @@ x-logging: &default-logging
 services:
   joplin:
     image: joplin/joplin:latest
+    pull_policy: always
     container_name: joplin-app
-    restart: unless-stopped
+    restart: always
     logging: *default-logging
     networks:
       - joplin
     ports:
-      - "22300:22300"
+      - "172.17.0.1:22300:22300"
     environment:
       TZ: ${TZ:-America/New_York}
-    volumes:
-      - ./volumes/data/joplin:/data
-      - ./volumes/config/joplin:/config
+      APP_PORT: 22300
+      APP_BASE_URL: http://${BASE_HOST_NAME:-localhost}:22300
+      DB_CLIENT: pg
+      POSTGRES_HOST: joplin-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: ${DB_CREATE_DATABASE_NAME:-joplin}
+      POSTGRES_USER: ${DB_USER_NAME:-joplin}
+      POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
     depends_on:
-      - joplin-db
+      joplin-db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:22300"]
       interval: 30s
@@ -30,9 +38,10 @@ services:
       retries: 3
 
   joplin-db:
-    image: postgres:16-alpine
+    image: postgres:latest
+    pull_policy: always
     container_name: joplin-db
-    restart: unless-stopped
+    restart: always
     logging: *default-logging
     networks:
       - joplin
@@ -44,11 +53,12 @@ services:
     volumes:
       - ./volumes/data/db/postgres/joplin:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${{POSTGRES_USER}} -d $${{POSTGRES_DB}}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 30s
       timeout: 10s
       retries: 3
 
 networks:
   joplin:
+    name: joplin
     external: false
