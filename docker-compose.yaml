@@ -9,7 +9,7 @@ x-logging: &default-logging
 
 services:
   joplin:
-    image: joplin/joplin:latest
+    image: joplin/server:latest
     pull_policy: always
     container_name: joplin-app
     restart: always
