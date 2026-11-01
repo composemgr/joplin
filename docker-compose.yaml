@@ -1,29 +1,24 @@
-# nginx proxy address - http://172.17.0.1:22300
-
+# nginx proxy address - http://172.17.0.1:64218
 name: joplin
 x-logging: &default-logging
-  driver: json-file
   options:
-    max-size: "5m"
-    max-file: "1"
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
 
 services:
   joplin:
     image: joplin/server:latest
-    pull_policy: always
     container_name: joplin-app
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
     restart: always
+    pull_policy: always
     logging: *default-logging
-    networks:
-      - joplin
-      - proxy
-      - cloudflare
-    ports:
-      - "172.17.0.1:22300:22300"
     environment:
       TZ: ${TZ:-America/New_York}
       APP_PORT: 22300
-      APP_BASE_URL: http://${BASE_HOST_NAME:-localhost}:22300
+      APP_BASE_URL: http://${BASE_HOST_NAME:-$HOSTNAME}
       DB_CLIENT: pg
       POSTGRES_HOST: joplin-db
       POSTGRES_PORT: 5432
@@ -36,35 +31,22 @@ services:
       joplin-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:22300"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:22300/api/ping']
       interval: 30s
       timeout: 10s
       retries: 3
-    labels:
-      - 'traefik.enable=true'
-      - 'cloudflare.enable=true'
-      - 'traefik.docker.network=proxy'
-      - 'cloudflare.service=http://joplin-app:22300'
-      - 'cloudflare.hostname=joplin.${CLOUDFLARE_ZONE_NAME:-}'
-      - 'traefik.http.routers.joplin-app.entrypoints=http'
-      - 'traefik.http.routers.joplin-app-secure.tls=true'
-      - 'traefik.http.routers.joplin-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
-      - 'traefik.http.middlewares.joplin-app-https-redirect.redirectscheme.scheme=https'
-      - 'traefik.http.routers.joplin-app.middlewares=joplin-app-https-redirect'
-      - 'traefik.http.routers.joplin-app-secure.entrypoints=https'
-      - 'traefik.http.routers.joplin-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
-      - 'traefik.http.routers.joplin-app-secure.tls.certresolver=cloudflare'
-      - 'traefik.http.routers.joplin-app-secure.service=joplin-app'
-      - 'traefik.http.services.joplin-app.loadbalancer.server.port=22300'
-
-  joplin-db:
-    image: postgres:latest
-    pull_policy: always
-    container_name: joplin-db
-    restart: always
-    logging: *default-logging
+    ports:
+      - '172.17.0.1:64218:22300'
     networks:
       - joplin
+  joplin-db:
+    image: postgres:16-alpine
+    container_name: joplin-db
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: joplin-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
     environment:
       TZ: ${TZ:-America/New_York}
       POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-joplin}
@@ -72,18 +54,16 @@ services:
       POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
       CONTAINER_NAME: joplin-db
     volumes:
-      - ./volumes/data/db/postgres/joplin:/var/lib/postgresql/data
+      - './volumes/db/postgres/joplin:/var/lib/postgresql/data:z'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - joplin
 
 networks:
   joplin:
     name: joplin
     external: false
-  proxy:
-    external: true
-  cloudflare:
-    external: true

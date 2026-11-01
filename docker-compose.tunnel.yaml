@@ -1,0 +1,73 @@
+name: joplin
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  joplin:
+    image: joplin/server:latest
+    container_name: joplin-app
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      APP_PORT: 22300
+      APP_BASE_URL: http://${BASE_HOST_NAME:-$HOSTNAME}
+      DB_CLIENT: pg
+      POSTGRES_HOST: joplin-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: ${DB_CREATE_DATABASE_NAME:-joplin}
+      POSTGRES_USER: ${DB_USER_NAME:-joplin}
+      POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
+      CONTAINER_NAME: joplin-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+    depends_on:
+      joplin-db:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:22300/api/ping']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - 'cloudflare.enable=true'
+      - 'cloudflare.service=http://joplin-app:22300'
+      - 'cloudflare.hostname=${BASE_HOST_NAME:-$HOSTNAME}'
+    networks:
+      - joplin
+      - cloudflare
+  joplin-db:
+    image: postgres:16-alpine
+    container_name: joplin-db
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: joplin-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-joplin}
+      POSTGRES_USER: ${DB_USER_NAME:-joplin}
+      POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
+      CONTAINER_NAME: joplin-db
+    volumes:
+      - './volumes/db/postgres/joplin:/var/lib/postgresql/data:z'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - joplin
+
+networks:
+  joplin:
+    name: joplin
+    external: false
+  cloudflare:
+    external: true
